@@ -1,2 +1,4 @@
 ﻿<Solution>
+  <Project Path="VectraRuntime.Test/VectraRuntime.Test.csproj" />
+  <Project Path="VectraRuntime/VectraRuntime.csproj" />
 </Solution>

@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using VectraRuntime.Executor.Models;
 using VectraRuntime.Loader.Models;
 
 namespace VectraRuntime;
@@ -22,32 +23,8 @@ internal static class Program
         
         using var stream = File.OpenRead(path);
         var module = new VbcLoader().Load(stream);
-
-        Console.WriteLine($"Version: {module.VersionMajor}.{module.VersionMinor}");
-
-        Console.WriteLine($"\nImports ({module.Imports.Count}):");
-        foreach (var import in module.Imports)
-            Console.WriteLine($"  - {import}");
-
-        Console.WriteLine($"\nConstants ({module.Constants.Count}):");
-        foreach (var c in module.Constants)
-        {
-            var value = c.NumericValue.HasValue ? c.NumericValue.Value.ToString(CultureInfo.InvariantCulture) : c.Name;
-            Console.WriteLine($"  [{c.Index}] {c.Kind,-12} {value}");
-        }
-
-        Console.WriteLine($"\nTypes ({module.Types.Count}):");
-        foreach (var t in module.Types)
-        {
-            Console.WriteLine($"  PoolIndex={t.PoolIndex} Methods={t.Methods.Count}");
-            foreach (var m in t.Methods)
-                Console.WriteLine($"    Method PoolIndex={m.PoolIndex} Params={m.ParameterCount}");
-        }
-
-        Console.WriteLine($"\nMethod Bodies ({module.MethodBodies.Count}):");
-        foreach (var b in module.MethodBodies)
-            Console.WriteLine($"  CallablePoolIndex={b.CallablePoolIndex} Locals={b.LocalSlotCount} BytecodeLength={b.Bytecode.Count}");
-
+        var executor = new Interpreter(module);
+        executor.Run();
         return 0;
     }
 }

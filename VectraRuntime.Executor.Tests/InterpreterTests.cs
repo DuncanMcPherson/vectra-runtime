@@ -271,7 +271,7 @@ public class InterpreterTests
 
         var module = BuildModule(bytecode, constants);
         var output = RunCapture(module);
-        output.Should().Be("Hello Vectra!\n");
+        output.Should().Be($"Hello Vectra!{Environment.NewLine}");
     }
 
     [Test]
@@ -301,5 +301,159 @@ public class InterpreterTests
         var act = () => new Interpreter(module).Run();
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*0xFF*");
+    }
+
+    [Test]
+    public void Call_InvokesMethodBody_andReturnsValue()
+    {
+        var constants = new List<ConstantEntry>
+        {
+            new(0, ConstantKind.Number, "10", 10),
+            new(1, ConstantKind.Method, "Test::Add()")
+        };
+        var addBody = new MethodBody(1, 1, Bytecode(
+            Opcode.LOAD_LOCAL, (ushort)0,
+            Opcode.LOAD_CONST, (ushort)0,
+            Opcode.ADD,
+            Opcode.RET));
+        
+        var mainEntry = new ConstantEntry(2, ConstantKind.Method, "Test::Main()");
+        constants.Add(mainEntry);
+        
+        var mainBody = new MethodBody(2, 1, Bytecode(
+            Opcode.LOAD_CONST, (ushort)0,
+            Opcode.CALL, (ushort)1, (ushort)1,
+            Opcode.RET));
+
+        var module = new VbcModule(1, 0, [], constants, [], [addBody, mainBody]);
+        var act = () => new Interpreter(module).Run();
+        act.Should().NotThrow();
+    }
+
+    [Test]
+    public void Call_PassesArgsCorrectly()
+    {
+        var constants = new List<ConstantEntry>
+        {
+            new(0, ConstantKind.Number, "7", 7),
+            new(1, ConstantKind.Number, "3", 3),
+            new(2, ConstantKind.Method, "Test::Sub()"),
+        };
+
+        // Sub() body: LOAD_LOCAL 0, LOAD_LOCAL 1, SUB, RET
+        var subBody = new MethodBody(2, 2, Bytecode(
+            Opcode.LOAD_LOCAL, (ushort)0,
+            Opcode.LOAD_LOCAL, (ushort)1,
+            Opcode.SUB,
+            Opcode.RET));
+
+        var mainEntry = new ConstantEntry(3, ConstantKind.Method, "Test::Main()");
+        constants.Add(mainEntry);
+
+        // Main: push 7, push 3, CALL Sub argCount=2, RET
+        var mainBody = new MethodBody(3, 1, Bytecode(
+            Opcode.LOAD_CONST, (ushort)0,
+            Opcode.LOAD_CONST, (ushort)1,
+            Opcode.CALL,       (ushort)2, (ushort)2,
+            Opcode.RET));
+
+        var module = new VbcModule(1, 0, [], constants, [], [subBody, mainBody]);
+        var act = () => new Interpreter(module).Run();
+        act.Should().NotThrow();
+    }
+    
+    [Test]
+    public void CallCtor_WithExplicitBody_InitializesObject()
+    {
+        var constants = new List<ConstantEntry>
+        {
+            new(0, ConstantKind.Type,        "Test.Foo"),
+            new(1, ConstantKind.Constructor, "Test.Foo::.ctor()"),
+            new(2, ConstantKind.Number,      "42", 42),
+            new(3, ConstantKind.Field,       "Test.Foo::Value"),
+        };
+
+        // ctor body: LOAD_LOCAL 0 (this), LOAD_LOCAL 1 (arg), STORE_MEMBER 3, RET
+        var ctorBody = new MethodBody(1, 2, Bytecode(
+            Opcode.LOAD_LOCAL,   (ushort)1,
+            Opcode.LOAD_LOCAL,   (ushort)0,
+            Opcode.STORE_MEMBER, (ushort)3,
+            Opcode.RET));
+
+        var mainEntry = new ConstantEntry(4, ConstantKind.Method, "Test::Main()");
+        constants.Add(mainEntry);
+
+        // Main: NEW_OBJ 0, DUP, LOAD_CONST 2, CALL_CTOR 1 argCount=2, RET
+        var mainBody = new MethodBody(4, 1, Bytecode(
+            Opcode.NEW_OBJ,    (ushort)0,
+            Opcode.DUP,
+            Opcode.LOAD_CONST, (ushort)2,
+            Opcode.CALL_CTOR,  (ushort)1, (ushort)2,
+            Opcode.RET));
+
+        var module = new VbcModule(1, 0, [], constants, [], [ctorBody, mainBody]);
+        var act = () => new Interpreter(module).Run();
+        act.Should().NotThrow();
+    }
+    
+    [Test]
+    public void CallCtor_WithNoEmittedBody_SynthesizesDefaultCtor()
+    {
+        var constants = new List<ConstantEntry>
+        {
+            new(0, ConstantKind.Type,        "Test.Bar"),
+            new(1, ConstantKind.Constructor, "Test.Bar::.ctor()"),
+        };
+
+        var mainEntry = new ConstantEntry(2, ConstantKind.Method, "Test::Main()");
+        constants.Add(mainEntry);
+
+        // Main: NEW_OBJ 0, DUP, CALL_CTOR 1 argCount=1 (just this), POP, RET
+        var mainBody = new MethodBody(2, 1, Bytecode(
+            Opcode.NEW_OBJ,   (ushort)0,
+            Opcode.DUP,
+            Opcode.CALL_CTOR, (ushort)1, (ushort)1,
+            Opcode.POP,
+            Opcode.RET));
+
+        // No ctor body emitted — runtime should synthesize one
+        var module = new VbcModule(1, 0, [], constants, [], [mainBody]);
+        var act = () => new Interpreter(module).Run();
+        act.Should().NotThrow();
+    }
+    
+    [Test]
+    public void CallCtor_ObjectRemainsOnStack_AfterCtorReturns()
+    {
+        var constants = new List<ConstantEntry>
+        {
+            new(0, ConstantKind.Type,        "Test.Baz"),
+            new(1, ConstantKind.Constructor, "Test.Baz::.ctor()"),
+            new(2, ConstantKind.Field,       "Test.Baz::Value"),
+            new(3, ConstantKind.Number,      "99", 99),
+        };
+
+        var ctorBody = new MethodBody(1, 2, Bytecode(
+            Opcode.LOAD_LOCAL,   (ushort)1,
+            Opcode.LOAD_LOCAL,   (ushort)0,
+            Opcode.STORE_MEMBER, (ushort)2,
+            Opcode.RET));
+
+        var mainEntry = new ConstantEntry(4, ConstantKind.Method, "Test::Main()");
+        constants.Add(mainEntry);
+
+        // Main: NEW_OBJ, DUP, LOAD_CONST 99, CALL_CTOR, LOAD_MEMBER Value, RET
+        // object stays on stack after ctor, then we read a field from it
+        var mainBody = new MethodBody(4, 2, Bytecode(
+            Opcode.NEW_OBJ,    (ushort)0,
+            Opcode.DUP,
+            Opcode.LOAD_CONST, (ushort)3,
+            Opcode.CALL_CTOR,  (ushort)1, (ushort)2,
+            Opcode.LOAD_MEMBER,(ushort)2,
+            Opcode.RET));
+
+        var module = new VbcModule(1, 0, [], constants, [], [ctorBody, mainBody]);
+        var act = () => new Interpreter(module).Run();
+        act.Should().NotThrow();
     }
 }

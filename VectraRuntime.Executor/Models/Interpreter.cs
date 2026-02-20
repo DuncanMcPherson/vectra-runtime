@@ -84,9 +84,16 @@ public sealed class Interpreter
 
                 case Opcode.ADD:
                 {
-                    var b = frame.Pop().AsNumber();
-                    var a = frame.Pop().AsNumber();
-                    frame.Push(StackValue.FromNumber(a + b));
+                    var b = frame.Pop();
+                    var a = frame.Pop();
+                    if (a.Kind == StackValueKind.String || b.Kind == StackValueKind.String)
+                    {
+                        frame.Push(StackValue.FromString(a.ToString() + b));
+                    }
+                    else
+                    {
+                        frame.Push(StackValue.FromNumber(a.AsNumber() + b.AsNumber()));
+                    }
                     break;
                 }
                 case Opcode.SUB:
@@ -140,30 +147,42 @@ public sealed class Interpreter
                 }
                 case Opcode.CLT:
                 {
-                    var b = frame.Pop().AsNumber();
-                    var a = frame.Pop().AsNumber();
-                    frame.Push(a < b ? StackValue.True : StackValue.False);
+                    var b = frame.Pop();
+                    var a = frame.Pop();
+                    var result = a.Kind == StackValueKind.String || b.Kind == StackValueKind.String
+                        ? string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) < 0
+                        : a.AsNumber() < b.AsNumber();
+                    frame.Push(result ? StackValue.True : StackValue.False);
                     break;
                 }
                 case Opcode.CLE:
                 {
-                    var b = frame.Pop().AsNumber();
-                    var a = frame.Pop().AsNumber();
-                    frame.Push(a <= b ? StackValue.True : StackValue.False);
+                    var b = frame.Pop();
+                    var a = frame.Pop();
+                    var result = a.Kind == StackValueKind.String || b.Kind == StackValueKind.String
+                        ? string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) <= 0
+                        : a.AsNumber() <= b.AsNumber();
+                    frame.Push(result ? StackValue.True : StackValue.False);
                     break;
                 }
                 case Opcode.CGT:
                 {
-                    var b = frame.Pop().AsNumber();
-                    var a = frame.Pop().AsNumber();
-                    frame.Push(a > b ? StackValue.True : StackValue.False);
+                    var b = frame.Pop();
+                    var a = frame.Pop();
+                    var result = a.Kind == StackValueKind.String || b.Kind == StackValueKind.String
+                        ? string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) > 0
+                        : a.AsNumber() > b.AsNumber();
+                    frame.Push(result ? StackValue.True : StackValue.False);
                     break;
                 }
                 case Opcode.CGE:
                 {
-                    var b = frame.Pop().AsNumber();
-                    var a = frame.Pop().AsNumber();
-                    frame.Push(a >= b ? StackValue.True : StackValue.False);
+                    var b = frame.Pop();
+                    var a = frame.Pop();
+                    var result = a.Kind == StackValueKind.String || b.Kind == StackValueKind.String
+                        ? string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) >= 0
+                        : a.AsNumber() >= b.AsNumber();
+                    frame.Push(result ? StackValue.True : StackValue.False);
                     break;
                 }
 

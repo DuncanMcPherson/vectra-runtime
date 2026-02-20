@@ -1,4 +1,7 @@
 ﻿<Solution>
-  <Project Path="VectraRuntime.Test/VectraRuntime.Test.csproj" />
+  <Project Path="VectraRuntime.Executor.Tests/VectraRuntime.Executor.Tests.csproj" />
+  <Project Path="VectraRuntime.Executor/VectraRuntime.Executor.csproj" />
+  <Project Path="VectraRuntime.Loader.Tests/VectraRuntime.Loader.Tests.csproj" />
+  <Project Path="VectraRuntime.Loader/VectraRuntime.Loader.csproj" />
   <Project Path="VectraRuntime/VectraRuntime.csproj" />
 </Solution>

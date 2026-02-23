@@ -130,6 +130,12 @@ public sealed class Interpreter
                     frame.Push(StackValue.FromNumber(-a));
                     break;
                 }
+                case Opcode.NOT:
+                {
+                    var value = frame.Pop();
+                    frame.Push(value.AsBoolean() ? StackValue.False : StackValue.True);
+                    break;
+                }
 
                 case Opcode.CEQ:
                 {

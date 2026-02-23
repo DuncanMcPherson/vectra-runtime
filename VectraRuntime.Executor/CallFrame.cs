@@ -8,6 +8,8 @@ public sealed class CallFrame
     public byte[] Bytecode { get; }
     public int IP { get; set; }
     public Stack<StackValue> Stack { get; } = new();
+    public bool HasRecoverActive { get; set; }
+    public ushort? RecoverIndex { get; set; }
 
     public CallFrame(int paramCount, byte[] bytecode)
     {
@@ -20,6 +22,8 @@ public sealed class CallFrame
         Locals = new StackValue[size];
         Array.Fill(Locals, StackValue.Null);
     }
+    
+    
     
     public void Push(StackValue value) => Stack.Push(value);
     public StackValue Pop() => Stack.Pop();

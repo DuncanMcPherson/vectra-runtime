@@ -44,7 +44,7 @@ public static class OpcodeOperands
         { Opcode.JMP_TRUE,  1 },
         { Opcode.JMP_FALSE, 1 },
         { Opcode.ABORT,      0 },
-        { Opcode.ENTER_ATTEMPT, 1 },
+        { Opcode.ENTER_ATTEMPT, 2 },
         { Opcode.LEAVE_ATTEMPT, 0 },
         { Opcode.ENTER_DEBRIEF, 0 },
         { Opcode.LEAVE_DEBRIEF, 0 },

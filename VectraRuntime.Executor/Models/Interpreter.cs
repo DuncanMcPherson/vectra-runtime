@@ -278,7 +278,14 @@ public sealed class Interpreter
                 }
 
                 case Opcode.RET:
-                    return new ExecuteResult.Normal(frame.Stack.Count > 0 ? frame.Pop() : StackValue.Null);
+                    var retVal = frame.TryPop();
+                    if (frame.DebriefIP is not null && frame.DebriefIP != 0)
+                    {
+                        frame.PendingReturn = retVal;
+                        frame.IP = frame.DebriefIP.Value;
+                        break;
+                    }
+                    return new ExecuteResult.Normal(retVal);
 
                 case Opcode.ABORT:
                 {
@@ -288,14 +295,21 @@ public sealed class Interpreter
                 case Opcode.ENTER_ATTEMPT:
                 {
                     var handlerIp = frame.ReadUShort();
-                    _attemptStack.Push((frame, handlerIp));
+                    var debriefIp = frame.ReadUShort();
+                    frame.DebriefIP = debriefIp != 0 ? debriefIp : null;
+                    if (handlerIp != 0)
+                        _attemptStack.Push((frame, handlerIp));
                     break;
                 }
                 case Opcode.LEAVE_ATTEMPT:
                     _attemptStack.Pop();
                     break;
                 case Opcode.ENTER_DEBRIEF:
+                    frame.DebriefIP = null;
+                    break;
                 case Opcode.LEAVE_DEBRIEF:
+                    if (frame.PendingReturn is {} pending)
+                        return new ExecuteResult.Normal(pending);
                     break;
 
                 default:
@@ -308,13 +322,17 @@ public sealed class Interpreter
 
     private ExecuteResult HandleUnwind(CallFrame frame, StackValue abortedValue)
     {
-        if (_attemptStack.TryPeek(out var attempt) && attempt.Frame == frame)
+        if (_attemptStack.TryPeek(out var attempt) && attempt.Frame == frame && attempt.HandlerIP != 0 && attempt.Frame.IP <= attempt.HandlerIP)
         {
             _attemptStack.Pop();
             frame.Push(abortedValue);
             frame.IP = attempt.HandlerIP;
             return ExecuteFrame(frame);
         }
+
+        if (frame.DebriefIP is null) return new ExecuteResult.Unwinding(abortedValue);
+        frame.IP = frame.DebriefIP.Value;
+        ExecuteFrame(frame);
         return new ExecuteResult.Unwinding(abortedValue);
     }
 

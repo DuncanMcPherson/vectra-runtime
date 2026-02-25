@@ -31,6 +31,7 @@ public static class OpcodeOperands
         { Opcode.DIV, 0 },
         { Opcode.MOD, 0 },
         { Opcode.NEG, 0 },
+        { Opcode.NOT, 0 },
 
         { Opcode.CEQ, 0 },
         { Opcode.CNE, 0 },
@@ -42,6 +43,11 @@ public static class OpcodeOperands
         { Opcode.JMP,       1 },
         { Opcode.JMP_TRUE,  1 },
         { Opcode.JMP_FALSE, 1 },
+        { Opcode.ABORT,      0 },
+        { Opcode.ENTER_ATTEMPT, 2 },
+        { Opcode.LEAVE_ATTEMPT, 0 },
+        { Opcode.ENTER_DEBRIEF, 0 },
+        { Opcode.LEAVE_DEBRIEF, 0 },
     };
 
     public static int For(Opcode opcode)

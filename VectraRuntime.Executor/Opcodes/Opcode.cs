@@ -29,6 +29,7 @@ public enum Opcode : byte
     DIV = 0x53,
     MOD = 0x54,
     NEG = 0x55,
+    NOT = 0x56,
 
     CEQ = 0x60,
     CNE = 0x61,
@@ -40,4 +41,9 @@ public enum Opcode : byte
     JMP       = 0x70,
     JMP_TRUE  = 0x71,
     JMP_FALSE = 0x72,
+    ABORT     = 0x73,
+    ENTER_ATTEMPT = 0x74,
+    LEAVE_ATTEMPT = 0x75,
+    ENTER_DEBRIEF = 0x76,
+    LEAVE_DEBRIEF = 0x77
 }

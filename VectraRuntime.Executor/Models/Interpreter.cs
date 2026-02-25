@@ -8,6 +8,8 @@ public sealed class Interpreter
 {
     private readonly VbcModule _module;
     private readonly NativeDispatch _native;
+    
+    private readonly Stack<(CallFrame Frame, ushort HandlerIP)> _attemptStack = new();
 
     public Interpreter(VbcModule module, NativeDispatch? native = null)
     {
@@ -18,7 +20,9 @@ public sealed class Interpreter
     public void Run()
     {
         var main = FindMain();
-        Execute(main, []);
+        var result = Execute(main, []);
+        if (result is ExecuteResult.Unwinding u)
+            throw new InvalidOperationException($"Unhandled abort: {u.AbortedValue}");
     }
 
     private MethodBody FindMain()
@@ -30,7 +34,7 @@ public sealed class Interpreter
                ?? throw new InvalidOperationException("No method found in module");
     }
 
-    private StackValue Execute(MethodBody body, StackValue[] args)
+    private ExecuteResult Execute(MethodBody body, StackValue[] args)
     {
         var frame = new CallFrame(body.LocalSlotCount, body.Bytecode.ToArray());
         for (var i = 0; i < args.Length && i < frame.Locals.Length; i++)
@@ -41,7 +45,7 @@ public sealed class Interpreter
         return ExecuteFrame(frame);
     }
 
-    private StackValue ExecuteFrame(CallFrame frame)
+    private ExecuteResult ExecuteFrame(CallFrame frame)
     {
         while (!frame.EndOfCode)
         {
@@ -128,6 +132,12 @@ public sealed class Interpreter
                 {
                     var a = frame.Pop().AsNumber();
                     frame.Push(StackValue.FromNumber(-a));
+                    break;
+                }
+                case Opcode.NOT:
+                {
+                    var value = frame.Pop();
+                    frame.Push(value.AsBoolean() ? StackValue.False : StackValue.True);
                     break;
                 }
 
@@ -222,7 +232,9 @@ public sealed class Interpreter
                     var args = PopArgs(frame, argCount);
                     var methodBody = FindMethodBody(methodIndex);
                     var result = Execute(methodBody, args);
-                    frame.Push(result);
+                    if (result is ExecuteResult.Unwinding u)
+                        return HandleUnwind(frame, u.AbortedValue);
+                    frame.Push(((ExecuteResult.Normal)result).Value);
                     break;
                 }
 
@@ -240,7 +252,9 @@ public sealed class Interpreter
                     var argCount = frame.ReadUShort();
                     var args = PopArgs(frame, argCount);
                     var ctorBody = FindMethodBody(ctorIndex);
-                    Execute(ctorBody, args);
+                    var res = Execute(ctorBody, args);
+                    if (res is ExecuteResult.Unwinding u)
+                        return HandleUnwind(frame, u.AbortedValue);
                     // object remains on stack from NEW_OBJ
                     break;
                 }
@@ -264,14 +278,62 @@ public sealed class Interpreter
                 }
 
                 case Opcode.RET:
-                    return frame.Stack.Count > 0 ? frame.Pop() : StackValue.Null;
+                    var retVal = frame.TryPop();
+                    if (frame.DebriefIP is not null && frame.DebriefIP != 0)
+                    {
+                        frame.PendingReturn = retVal;
+                        frame.IP = frame.DebriefIP.Value;
+                        break;
+                    }
+                    return new ExecuteResult.Normal(retVal);
+
+                case Opcode.ABORT:
+                {
+                    var value = frame.Pop();
+                    return HandleUnwind(frame, value);
+                }
+                case Opcode.ENTER_ATTEMPT:
+                {
+                    var handlerIp = frame.ReadUShort();
+                    var debriefIp = frame.ReadUShort();
+                    frame.DebriefIP = debriefIp != 0 ? debriefIp : null;
+                    if (handlerIp != 0)
+                        _attemptStack.Push((frame, handlerIp));
+                    break;
+                }
+                case Opcode.LEAVE_ATTEMPT:
+                    _attemptStack.Pop();
+                    break;
+                case Opcode.ENTER_DEBRIEF:
+                    frame.DebriefIP = null;
+                    break;
+                case Opcode.LEAVE_DEBRIEF:
+                    if (frame.PendingReturn is {} pending)
+                        return new ExecuteResult.Normal(pending);
+                    break;
 
                 default:
                     throw new InvalidOperationException($"Unknown opcode: 0x{(byte)opcode:X2}");
             }
         }
 
-        return StackValue.Null;
+        return new ExecuteResult.Normal(StackValue.Null);
+    }
+
+    private ExecuteResult HandleUnwind(CallFrame frame, StackValue abortedValue)
+    {
+        if (_attemptStack.TryPeek(out var attempt) && attempt.Frame == frame && attempt.HandlerIP != 0 && attempt.Frame.IP <= attempt.HandlerIP)
+        {
+            _attemptStack.Pop();
+            frame.Push(abortedValue);
+            frame.IP = attempt.HandlerIP;
+            return ExecuteFrame(frame);
+        }
+
+        if (frame.DebriefIP is null) return new ExecuteResult.Unwinding(abortedValue);
+        frame.IP = frame.DebriefIP.Value;
+        ExecuteFrame(frame);
+        return new ExecuteResult.Unwinding(abortedValue);
     }
 
     private MethodBody FindMethodBody(ushort poolIndex)

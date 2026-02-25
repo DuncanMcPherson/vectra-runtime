@@ -8,6 +8,8 @@ public sealed class CallFrame
     public byte[] Bytecode { get; }
     public int IP { get; set; }
     public Stack<StackValue> Stack { get; } = new();
+    public StackValue? PendingReturn { get; set; }
+    public int? DebriefIP { get; set; }
 
     public CallFrame(int paramCount, byte[] bytecode)
     {
@@ -21,12 +23,14 @@ public sealed class CallFrame
         Array.Fill(Locals, StackValue.Null);
     }
     
+    
+    
     public void Push(StackValue value) => Stack.Push(value);
     public StackValue Pop() => Stack.Pop();
 
-    public StackValue? TryPop()
+    public StackValue TryPop()
     {
-        return Stack.Count == 0 ? null : Stack.Pop();
+        return Stack.Count == 0 ? StackValue.Null : Stack.Pop();
     }
     public StackValue Peek() => Stack.Peek();
 

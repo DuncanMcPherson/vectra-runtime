@@ -28,7 +28,7 @@ public sealed class Interpreter
     private MethodBody FindMain()
     {
         var mainEntry = _module.Constants.FirstOrDefault(c =>
-                            c.Kind == ConstantKind.Method && c.Name.EndsWith("::Main()")) ??
+                            c.Kind == ConstantKind.Method && c.Name.Contains("::Main(")) ??
                         throw new InvalidOperationException("No Program.Main found in module");
         return _module.MethodBodies.FirstOrDefault(b => b.CallablePoolIndex == mainEntry.Index)
                ?? throw new InvalidOperationException("No method found in module");
@@ -311,7 +311,29 @@ public sealed class Interpreter
                     if (frame.PendingReturn is {} pending)
                         return new ExecuteResult.Normal(pending);
                     break;
-
+                case Opcode.NEW_ARR:
+                {
+                    var elementTypeIndex = frame.ReadUShort();
+                    var size = frame.Pop().AsNumber();
+                    var arr = new VectraArray(elementTypeIndex, (int)size);
+                    frame.Push(StackValue.FromArray(arr));
+                    break;
+                }
+                case Opcode.LOAD_ELEM:
+                {
+                    var index = (int)frame.Pop().AsNumber();
+                    var arr = frame.Pop().AsArray();
+                    frame.Push(arr.Get(index));
+                    break;
+                }
+                case Opcode.STORE_ELEM:
+                {
+                    var index = (int)frame.Pop().AsNumber();
+                    var arr = frame.Pop().AsArray();
+                    var value = frame.Pop();
+                    arr.Set(index, value);
+                    break;
+                }
                 default:
                     throw new InvalidOperationException($"Unknown opcode: 0x{(byte)opcode:X2}");
             }

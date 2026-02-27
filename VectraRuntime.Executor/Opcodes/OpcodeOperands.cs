@@ -19,6 +19,9 @@ public static class OpcodeOperands
         { Opcode.NEW_OBJ,      1 },
         { Opcode.LOAD_MEMBER,  1 },
         { Opcode.STORE_MEMBER, 1 },
+        { Opcode.NEW_ARR, 1 },
+        { Opcode.LOAD_ELEM, 0 },
+        { Opcode.STORE_ELEM, 0 },
 
         { Opcode.CALL,         2 },
         { Opcode.CALL_CTOR,    2 },
